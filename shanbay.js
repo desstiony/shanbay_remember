@@ -1,5 +1,37 @@
 const https = require("https");
 const fs = require("fs");
+const { Configuration, OpenAIApi } = require("openai");
+
+
+async function openai_worlds(worlds) {
+  const configuration = new Configuration({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+  const openai = new OpenAIApi(configuration);
+  let messages = [
+    { "role": "system", "content": "You are helpful English Teaching Assistant" }
+  ]
+  try {
+    messages.push(
+      { "role": "user", "content": "请根据下边的单词，使用英文编写一篇简短的故事，并分段逐句添加中文释意，注意排版清晰可读。" + worlds }
+    )
+    const completion = await openai.createChatCompletion({
+      "model": "gpt-3.5-turbo",
+      "messages": messages
+    })
+    const reply = completion.data.choices[0].message.content
+    return reply
+    // messages.append({"role": "English Teaching Assistant", "content": reply})
+  } catch (error) {
+    if (error.response) {
+      console.log("error status: " + error.response.status)
+      console.log("error data: " + error.response.data)
+    } else {
+      console.log("erroe message: " + error.message)
+    }
+
+  }
+}
 
 const args = process.argv.slice(2);
 if (args.length < 3) {
@@ -115,14 +147,14 @@ class Random {
       this.status[(idx + 1) & 3] = Num.xor(
         this.status[(idx + 1) & 3],
         idx +
-          1 +
-          Num.mul(
-            1812433253,
-            Num.xor(
-              this.status[idx & 3],
-              Num.shiftRight(this.status[idx & 3], 30)
-            )
+        1 +
+        Num.mul(
+          1812433253,
+          Num.xor(
+            this.status[idx & 3],
+            Num.shiftRight(this.status[idx & 3], 30)
           )
+        )
       );
     });
 
@@ -253,7 +285,7 @@ class Tree {
 
   decode(enc) {
     let dec = "";
-    for (let i = 4; i < enc.length; ) {
+    for (let i = 4; i < enc.length;) {
       if (enc[i] === "=") {
         dec += "=";
         i++;
@@ -302,6 +334,7 @@ const decode = (enc) => {
 };
 
 function send2telegram(text) {
+  console.log("open ai: " + text)
   const data = JSON.stringify({
     chat_id: chatId,
     text: text,
@@ -388,7 +421,7 @@ async function getAndSendResult(materialbookId, message = "", page = 1, wordsTyp
       wordsObject.forEach((w) => {
         const wordsName = w.vocab_with_senses.word;
         wordsArray.push(wordsName);
-        const audioUrl =  w.vocab_with_senses.sound.audio_us_urls[0]
+        const audioUrl = w.vocab_with_senses.sound.audio_us_urls[0]
         if (audioUrl) {
           downloadAudio(audioUrl, i, wordsType)
           i++
@@ -398,13 +431,14 @@ async function getAndSendResult(materialbookId, message = "", page = 1, wordsTyp
         const wordsMessageType = wordsMessageMap.get(wordsType)
         message += `今天的 ${totalNew} 个${wordsMessageType}\n`;
       }
-      message += wordsArray.join("\n");
-      message += "\n";
+      message += wordsArray.join(", ");
+      message += ", ";
       if (page < pageCount) {
         page += 1;
         getAndSendResult(materialbookId, message, page, wordsType);
       } else {
-        send2telegram(message);
+        openai_worlds(message).then((res) => send2telegram(res))
+        // send2telegram(message);
       }
     });
   });
