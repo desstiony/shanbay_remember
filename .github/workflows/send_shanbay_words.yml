@@ -11,6 +11,7 @@ on:
       - shanbay.js
 env:
   TZ: Asia/Shanghai
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
 jobs:
   sender:
