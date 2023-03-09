@@ -334,11 +334,9 @@ const decode = (enc) => {
 };
 
 function send2telegram(text) {
-  console.log("open ai: " + text)
-  const data = JSON.stringify({
+  const payload = JSON.stringify({
     chat_id: chatId,
-    text: text,
-    parse_mode: "MarkdownV2",
+    text: text
   });
 
   const options = {
@@ -348,15 +346,23 @@ function send2telegram(text) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Content-Length": data.length,
     },
   };
 
   const req = https.request(options, (res) => {
-    console.log(`statusCode: ${res.statusCode}`);
+    console.error(`Telegram API returned a status code of ${res.statusCode}`);
+    let rawData = "";
 
-    res.on("data", () => {
-      console.log("succeed");
+    res.on("data", (chunk) => {
+      rawData += chunk;
+    });
+    res.on("end", () => {
+      const response = JSON.parse(rawData);
+      if (!response.ok) {
+        console.error("Send failed: ", response.description);
+      } else {
+        console.log("Send success!")
+      }
     });
   });
 
@@ -364,7 +370,7 @@ function send2telegram(text) {
     console.error(error);
   });
 
-  req.write(data);
+  req.write(payload);
   req.end();
 }
 
@@ -399,7 +405,7 @@ function downloadAudio(audioUrl, audioName, wordsType) {
   });
 }
 
-async function getAndSendResult(materialbookId, message = "", page = 1, wordsType="NEW") {
+async function getAndSendResult(materialbookId, message = "", openaiMsg = "", page = 1, wordsType = "NEW") {
   let results = "";
   options.path = PATH_API(page, materialbookId, wordsType);
   let req = https.request(options, function (res) {
@@ -430,15 +436,18 @@ async function getAndSendResult(materialbookId, message = "", page = 1, wordsTyp
       if (page === 1) {
         const wordsMessageType = wordsMessageMap.get(wordsType)
         message += `今天的 ${totalNew} 个${wordsMessageType}\n`;
+        openaiMsg += `今天的 ${totalNew} 个${wordsMessageType}\n`;
       }
-      message += wordsArray.join(", ");
-      message += ", ";
+      message += wordsArray.join("\n");
+      message += "\n";
+      openaiMsg += wordsArray.join(", ");
+      openaiMsg += ", ";
       if (page < pageCount) {
         page += 1;
-        getAndSendResult(materialbookId, message, page, wordsType);
+        getAndSendResult(materialbookId, message, openaiMsg, page, wordsType);
       } else {
-        openai_worlds(message).then((res) => send2telegram(res))
-        // send2telegram(message);
+        send2telegram(message)
+        openai_worlds(openaiMsg).then((res) => send2telegram(res))
       }
     });
   });
@@ -452,7 +461,7 @@ async function getAndSendResult(materialbookId, message = "", page = 1, wordsTyp
 async function main() {
   const materialbookId = await getMaterialBookIdApi()
   await getAndSendResult(materialbookId); // new words
-  await getAndSendResult(materialbookId, message="", page=1, wordsType="REVIEW") // old words
+  await getAndSendResult(materialbookId, message = "", openaiMsg = "", page = 1, wordsType = "REVIEW") // old words
 }
 
 main()
