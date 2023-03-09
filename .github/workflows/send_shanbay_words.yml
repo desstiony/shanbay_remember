@@ -21,6 +21,10 @@ jobs:
         run: sudo apt-get update
       - name: Setup ffmpeg for differnt platforms 
         uses: FedericoCarboni/setup-ffmpeg@master
+      - name: Setup openai lib
+        uses: actions/checkout@v2
+        run: |
+          npm install openai  
       - name: Use Node.js 12.x
         uses: actions/setup-node@v1
         with:
